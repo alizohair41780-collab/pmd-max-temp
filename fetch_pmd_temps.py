@@ -1,7 +1,6 @@
 import re
 import pandas as pd
 from playwright.sync_api import sync_playwright
-import os
 
 def fetch_max_temps():
     url = 'https://metkhi.pmd.gov.pk/Max-Temp.php'
@@ -10,22 +9,35 @@ def fetch_max_temps():
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
         page.goto(url, wait_until="networkidle")
+        
+        # Extra wait for the table to fully load (this fixes most cloud issues)
+        page.wait_for_timeout(8000)
+        page.wait_for_selector('div.date', timeout=15000)
+        
         html = page.content()
         browser.close()
+    
+    print("✅ Page loaded. HTML length:", len(html))
     
     # Extract date
     date_match = re.search(r'class="date">\s*([^<]+)\s*</div>', html)
     date_str = date_match.group(1).strip() if date_match else 'Unknown'
     date_str = re.sub(r'^[^0-9]+', '', date_str)
     date_str = re.sub(r'\s+\d{1,2}:\d{2}:\d{2}.*$', '', date_str).strip()
+    print("📅 Extracted date:", date_str)
     
-    # Extract 19 temperatures
+    # Extract temperatures
     temp_regex = r'<tr><td>\d+<\/td><td>\d+<\/td><td>[^<]+<\/td><td>([\d.]+)<\/td><\/tr>'
     temps = re.findall(temp_regex, html)
+    print("🔢 Found temperatures:", len(temps))
     
     if len(temps) != 19:
-        print(f"⚠️ Table changed! Found {len(temps)} rows.")
-        return
+        print("⚠️ ERROR: Expected 19 rows but found", len(temps))
+        print("First 300 characters of HTML for debugging:")
+        print(html[:300])
+        print("Last 300 characters of HTML:")
+        print(html[-300:])
+        return  # This caused the exit code 1
     
     stations = ["BADIN","CHHOR","DADU","HYDERABAD","HYDERABAD AIRPORT","JACOBABAD","KARACHI","KHAIRPUR","LARKANA","MIR PUR KHAS","MITHI","MOHENJO DARO","NAWABSHAH","PADIDAN","ROHRI","SAKRAND","SUKKUR","TANDO JAM","THATTA"]
     
