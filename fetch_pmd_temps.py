@@ -87,4 +87,4 @@ def scrape_pmd_max_temperatures():
     print("🎉 Scraping completed successfully!")
 
 if __name__ == "__main__":
-    scrape_pmd_temps.py
+    scrape_pmd_max_temperatures()
