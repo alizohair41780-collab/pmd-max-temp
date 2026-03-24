@@ -5,42 +5,66 @@ import os
 
 async def scrape_ncm():
     async with async_playwright() as p:
+        # Launch browser
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
         
-        # Set a large viewport to ensure the whole table is rendered properly
-        await page.set_viewport_size({"width": 1280, "height": 3000})
+        # Set a tall viewport to ensure the full table is rendered
+        await page.set_viewport_size({"width": 1366, "height": 4000})
         
         url = "https://www.ncm.gov.ae/services/climate-reports-daily?lang=en"
         print(f"🔗 Navigating to {url}")
         
         try:
+            # Navigate with a generous timeout for the heavy NCM site
             await page.goto(url, wait_until="domcontentloaded", timeout=120000)
             
-            print("🍪 Looking for cookie banner...")
-            # We wait up to 10 seconds specifically for the button to be clickable
-            cookie_button = page.get_by_role("button", name="I Agree")
-            try:
-                await cookie_button.wait_for(state="visible", timeout=10000)
-                await cookie_button.click()
-                print("✅ Cookie banner clicked.")
-                # Give it a second to disappear from the screen
-                await asyncio.sleep(2) 
-            except Exception:
-                print("⚠️ Could not find or click cookie button, moving on...")
+            print("⏳ Page reached. Waiting 20 seconds for table data to fully load...")
+            await asyncio.sleep(20) 
 
-            print("⏳ Waiting 15 seconds for table data to settle...")
-            await asyncio.sleep(15) 
+            # --- THE FIX: DIGITALLY ERASE THE COOKIE BANNER AND OVERLAYS ---
+            print("🧹 Cleaning up the page (removing cookie banners and overlays)...")
+            await page.evaluate("""
+                // Identify common selectors for the NCM cookie bar and general overlays
+                const selectors = [
+                    '.cookie-bar', 
+                    '.cookie-notice', 
+                    '#cookie-banner', 
+                    '.modal-backdrop', 
+                    '.modal'
+                ];
+                
+                selectors.forEach(s => {
+                    const elements = document.querySelectorAll(s);
+                    elements.forEach(el => el.remove());
+                });
+
+                # This specifically targets the "Sticky" bar hiding your data
+                const allDivs = document.querySelectorAll('div');
+                allDivs.forEach(div => {
+                    const style = window.getComputedStyle(div);
+                    if (style.position === 'fixed' || style.position === 'sticky') {
+                        div.remove();
+                    }
+                });
+            """)
             
+            # Short pause to let the layout settle after removal
+            await asyncio.sleep(2) 
+
+            # Generate filename with date
             timestamp = datetime.now().strftime("%Y-%m-%d")
             screenshot_name = f"ncm_snapshot_{timestamp}.png"
             
-            # Take a full page screenshot
+            # Take the full-page screenshot
+            print(f"📸 Taking screenshot: {screenshot_name}")
             await page.screenshot(path=screenshot_name, full_page=True)
-            print(f"📸 Screenshot saved: {screenshot_name}")
+            
+            if os.path.exists(screenshot_name):
+                print(f"✅ Success! Screenshot saved and verified.")
             
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"❌ Error during scrape: {e}")
         finally:
             await browser.close()
 
