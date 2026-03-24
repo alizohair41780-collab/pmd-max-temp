@@ -4,57 +4,63 @@ from datetime import datetime
 import os
 import time
 
-URL = "https://metkhi.pmd.gov.pk/Max-Temp.php"   # ← Your desired Sindh page
-EXCEL_FILE = "PMD_Max_Temperatures.xlsx"
+URL = "https://metkhi.pmd.gov.pk/Max-Temp.php"
+EXCEL_FILE = "PMD_Sindh_Max_Temperatures.xlsx"   # Renamed for clarity
 
-def scrape_pmd_max_temperatures():
+def scrape_pmd_sindh_max_temp():
     print("🚀 Starting Sindh Max Temperature Scraper...")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+            viewport={"width": 1366, "height": 768},
+            locale="en-US",
+            timezone_id="Asia/Karachi"
         )
         page = context.new_page()
 
-        print(f"Loading Sindh Max Temp page: {URL}")
-        page.goto(URL, wait_until="networkidle", timeout=90000)
-        time.sleep(8)  # Give time for table to load
+        print(f"Loading page: {URL}")
+        response = page.goto(URL, wait_until="networkidle", timeout=90000)
+        
+        print(f"Response status: {response.status if response else 'Unknown'}")
+        
+        time.sleep(10)   # Extra long wait
 
-        # Debugging files
-        page.screenshot(path="debug_screenshot.png")
+        # Save debug files
+        page.screenshot(path="debug_screenshot.png", full_page=True)
         with open("debug_page.html", "w", encoding="utf-8") as f:
             f.write(page.content())
-        print("📸 Screenshot and HTML saved for debugging")
+        print("📸 Debug files saved: debug_screenshot.png and debug_page.html")
 
-        # Find the table (Sindh page usually has one main table)
-        print("Looking for temperature table...")
-        table = page.locator("table").first
-        rows = table.locator("tr").all()
+        # Try to find table
+        print("Searching for table...")
+        tables = page.locator("table").all()
+        print(f"Found {len(tables)} table(s) on the page")
 
         data = []
         date_info = "Unknown Date"
 
-        for i, row in enumerate(rows):
-            cells = row.locator("td").all()
-            if len(cells) >= 2:
-                city = cells[0].inner_text().strip()
-                temp = cells[1].inner_text().strip().replace("°C", "").replace(" ", "")
-                
-                if city and temp and city.upper() != "STATION" and city.upper() != "CITY":
-                    data.append({"City": city, "Max_Temperature_C": temp})
-            elif len(cells) == 1 and i < 3:   # Try to capture date from top rows
-                date_info = cells[0].inner_text().strip()
+        for table in tables:
+            rows = table.locator("tr").all()
+            for row in rows:
+                cells = row.locator("td").all()
+                if len(cells) >= 2:
+                    city = cells[0].inner_text().strip()
+                    temp = cells[1].inner_text().strip().replace("°C", "").strip()
+                    if city and temp and len(city) > 2 and "station" not in city.lower():
+                        data.append({"City": city, "Max_Temperature_C": temp})
 
         browser.close()
 
     if not data:
-        print("❌ No data extracted from Sindh page. Check debug files.")
+        print("❌ Still no data extracted. The website is likely blocking automated access.")
+        print("   Please download debug_screenshot.png and check what it shows.")
         return
 
-    print(f"✅ Scraped {len(data)} stations from Sindh. Date: {date_info}")
+    print(f"✅ Successfully scraped {len(data)} stations!")
 
-    # Save to Excel
+    # Save data
     df = pd.DataFrame(data)
     today = datetime.now().strftime("%Y-%m-%d")
     df["Scrape_Date"] = today
@@ -63,16 +69,13 @@ def scrape_pmd_max_temperatures():
     if os.path.exists(EXCEL_FILE):
         with pd.ExcelWriter(EXCEL_FILE, mode='a', if_sheet_exists='new', engine='openpyxl') as writer:
             df.to_excel(writer, sheet_name=today, index=False)
-        print(f"Appended new sheet: {today}")
     else:
         df.to_excel(EXCEL_FILE, sheet_name=today, index=False)
-        print(f"Created new Excel file: {EXCEL_FILE}")
 
-    # Update Latest sheet
     with pd.ExcelWriter(EXCEL_FILE, mode='a', if_sheet_exists='replace', engine='openpyxl') as writer:
         df.to_excel(writer, sheet_name="Latest", index=False)
 
-    print("🎉 Done! Excel file is ready.")
+    print("🎉 Excel file updated successfully!")
 
 if __name__ == "__main__":
-    scrape_pmd_max_temperatures()
+    scrape_pmd_sindh_max_temp()
