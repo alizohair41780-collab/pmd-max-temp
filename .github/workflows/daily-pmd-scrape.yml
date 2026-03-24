@@ -32,17 +32,18 @@ jobs:
         run: python fetch_pmd_temps.py
 
       - name: Save Results
-        if: always()
+        # This line ensures it runs even if the Python script has an error
+        if: always() 
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # This adds both the Excel file and the Screenshot
+          # Add any .xlsx or .png files that were created
           git add *.xlsx *.png 2>/dev/null || echo "No files to add"
           
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Auto-update: Data and Screenshot - $(date +'%Y-%m-%d')"
+            git commit -m "Auto-update: Data/Screenshot - $(date +'%Y-%m-%d')"
             git push
           fi
