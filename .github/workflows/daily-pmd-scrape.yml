@@ -37,13 +37,14 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Force add the screenshot and any excel files
-          git add -f *.png *.xlsx 2>/dev/null || echo "No files found to add"
+          # This specifically tells git to include the new screenshot file
+          git add ncm_snapshot_*.png 2>/dev/null || echo "No screenshots found"
+          git add *.xlsx 2>/dev/null || echo "No excel files found"
           
-          # Check if there is anything to commit
-          if [ -n "$(git status --porcelain)" ]; then
+          # Check if there is anything new to upload
+          if [ -n "$(git status --short)" ]; then
             git commit -m "Auto-update: Data/Screenshot - $(date +'%Y-%m-%d')"
             git push origin main
           else
-            echo "No changes detected, nothing to push."
+            echo "Nothing new to save."
           fi
