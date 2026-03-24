@@ -9,7 +9,6 @@ def scrape_ncm_uae():
     
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        # Use a standard desktop window size
         context = browser.new_context(viewport={'width': 1280, 'height': 2000})
         page = context.new_page()
 
@@ -19,29 +18,29 @@ def scrape_ncm_uae():
             print(f"🔗 Navigating to {URL}")
             page.goto(URL, wait_until="domcontentloaded", timeout=120000)
             
-            # Wait for the table container to appear
+            # Wait for the table to appear
             print("⏳ Waiting for the data table...")
             page.wait_for_selector("table", timeout=60000)
-            
-            # Give the JavaScript 5 seconds to fill the table with numbers
-            time.sleep(5)
+            time.sleep(5) # Let the JavaScript finish loading numbers
 
-            # Capture Screenshot
+            # --- CAPTURE SCREENSHOT ---
             date_str = datetime.now().strftime("%Y-%m-%d")
             screenshot_name = f"ncm_snapshot_{date_str}.png"
             page.screenshot(path=screenshot_name, full_page=True)
             print(f"📸 Screenshot saved: {screenshot_name}")
 
-            # Scrape Table
-            rows = page.query_selector_all("table tr")
-            data = []
-            for row in rows:
-                cols = row.query_selector_all("td")
-                if len(cols) == 10:
-                    data.append([col.inner_text().strip() for col in cols])
+            # --- SCRAPE DATA (Stable Method) ---
+            print("📊 Extracting table data...")
+            data = page.evaluate("""() => {
+                const rows = Array.from(document.querySelectorAll('table tr'));
+                return rows.map(row => {
+                    const cols = Array.from(row.querySelectorAll('td'));
+                    return cols.map(col => col.innerText.trim());
+                }).filter(row => row.length === 10);
+            }""")
 
             if not data:
-                print("⚠️ No data found in the table. Check the website layout.")
+                print("⚠️ No data found. The table might be empty or layout changed.")
                 return
 
             # Save to Excel
