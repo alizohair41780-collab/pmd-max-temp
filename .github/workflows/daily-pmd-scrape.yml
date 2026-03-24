@@ -2,7 +2,7 @@ name: Daily PMD Max Temp Scrape
 
 on:
   schedule:
-    - cron: '0 14 * * *'      # 11:05 PM Pakistan time (UTC+5)
+    - cron: '0 14 * * *'      # 11:15 PM Pakistan time (UTC+5)
   workflow_dispatch:          # Allows manual run anytime
 
 jobs:
