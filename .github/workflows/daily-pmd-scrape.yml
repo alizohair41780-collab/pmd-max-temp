@@ -10,12 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -30,17 +33,18 @@ jobs:
       - name: Run the scraper
         run: python fetch_pmd_temps.py
 
-      - name: Commit and push updated Excel (if changes exist)
+      - name: Commit and push updated Excel
         run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Only commit if the Excel file actually exists
-          if [ -f "PMD_Max_Temperatures.xlsx" ]; then
-            git add PMD_Max_Temperatures.xlsx
-            git commit -m "Update PMD Max Temperatures - $(date)" || echo "No changes to commit"
-            git push
+          # This specifically adds the file your script creates
+          git add NCM_UAE_Daily_Climate_Report.xlsx
+          
+          # This checks if there's actually a new file to save
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
           else
-            echo "Excel file not found - skipping commit"
+            git commit -m "Update UAE Weather Data - $(date)"
+            git push
           fi
-        continue-on-error: true
