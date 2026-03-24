@@ -12,10 +12,18 @@ async def scrape_ncm():
         print(f"🔗 Navigating to {url}")
         
         try:
-            # We increased the timeout to 120 seconds and changed the wait condition
             await page.goto(url, wait_until="domcontentloaded", timeout=120000)
             
-            print("⏳ Page reached. Waiting 15 seconds for the table to render...")
+            # --- NEW: CLICK THE COOKIE BUTTON ---
+            print("🍪 Attempting to clear the cookie banner...")
+            try:
+                # This looks for the "I Agree" button and clicks it
+                await page.get_by_role("button", name="I Agree").click(timeout=5000)
+                print("✅ Cookie banner dismissed.")
+            except Exception:
+                print("⚠️ Cookie banner not found or already gone.")
+
+            print("⏳ Waiting 15 seconds for the table to render...")
             await asyncio.sleep(15) 
             
             timestamp = datetime.now().strftime("%Y-%m-%d")
