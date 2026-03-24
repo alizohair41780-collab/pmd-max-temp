@@ -11,8 +11,6 @@ env:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
     permissions:
       contents: write
 
@@ -30,20 +28,19 @@ jobs:
           pip install playwright pandas openpyxl
           python -m playwright install chromium --with-deps
 
-      - name: Run Scraper and Capture Screenshot
+      - name: Run Scraper
         run: python fetch_pmd_temps.py
 
-      - name: Commit and push changes
+      - name: Save Results
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # This saves all .xlsx and .png files created today
-          git add *.xlsx *.png
-          
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "Auto-update: Data and Screenshot - $(date +'%Y-%m-%d')"
+          # Only try to add files if they actually exist
+          if ls *.xlsx 1> /dev/null 2>&1; then
+            git add *.xlsx *.png
+            git commit -m "Auto-update weather data: $(date +'%Y-%m-%d')"
             git push
+          else
+            echo "No new Excel files found. Skipping push."
           fi
