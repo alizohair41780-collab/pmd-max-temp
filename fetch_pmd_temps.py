@@ -15,13 +15,13 @@ async def scrape_ncm():
         print(f"🔗 Navigating to {url}")
         
         try:
+            # Use domcontentloaded for faster/more reliable access on this heavy site
             await page.goto(url, wait_until="domcontentloaded", timeout=120000)
             
             print("⏳ Page reached. Waiting 20 seconds for table data...")
             await asyncio.sleep(20) 
 
-            print("🧹 Digitally erasing the cookie banner...")
-            # This part is now simplified to avoid Syntax Errors
+            print("🧹 Erasing cookie banners and sticky overlays...")
             await page.evaluate("""
                 const selectors = ['.cookie-bar', '.cookie-notice', '#cookie-banner', '.modal-backdrop', '.modal'];
                 selectors.forEach(s => {
@@ -40,14 +40,16 @@ async def scrape_ncm():
             
             await asyncio.sleep(2) 
 
-            timestamp = datetime.now().strftime("%Y-%m-%d")
+            # --- TIMESTAMP LOGIC ---
+            # This creates a name like: ncm_snapshot_2026-03-25_15-00.png
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
             screenshot_name = f"ncm_snapshot_{timestamp}.png"
             
             print(f"📸 Taking screenshot: {screenshot_name}")
             await page.screenshot(path=screenshot_name, full_page=True)
             
             if os.path.exists(screenshot_name):
-                print(f"✅ Success! Screenshot saved and verified.")
+                print(f"✅ Success! Saved as {screenshot_name}")
             
         except Exception as e:
             print(f"❌ Error during scrape: {e}")
