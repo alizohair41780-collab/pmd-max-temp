@@ -2,13 +2,13 @@ name: PMD Temperature Scraper
 
 on:
   schedule:
-    - cron: '0 3 * * *'     # Runs every day at 3:00 AM UTC (adjust as needed)
+    - cron: '0 3 * * *'     # Runs every day at 3:00 AM UTC
   workflow_dispatch:        # Allows manual trigger from GitHub
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 10     # Safety timeout
+    timeout-minutes: 10
 
     steps:
       - name: Checkout code
@@ -28,9 +28,9 @@ jobs:
           python -m playwright install chromium --with-deps
 
       - name: Run the scraper
-        run: python your_script_name.py     # ← Change to your actual filename (e.g. scrape_max_temp.py)
+        run: python fetch_pmd_temps.py
 
-      - name: Commit and push updated Excel (optional but useful)
+      - name: Commit and push updated Excel
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
