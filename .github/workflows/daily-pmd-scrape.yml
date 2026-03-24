@@ -2,13 +2,13 @@ name: PMD Temperature Scraper
 
 on:
   schedule:
-    - cron: '0 3 * * *'     # Runs every day at 3:00 AM UTC
-  workflow_dispatch:        # Allows manual trigger from GitHub
+    - cron: '0 3 * * *'
+  workflow_dispatch:
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code
@@ -23,18 +23,24 @@ jobs:
         run: |
           pip install playwright pandas openpyxl
 
-      - name: Install Playwright Browsers (Chromium + system deps)
+      - name: Install Playwright Browsers
         run: |
           python -m playwright install chromium --with-deps
 
       - name: Run the scraper
         run: python fetch_pmd_temps.py
 
-      - name: Commit and push updated Excel
+      - name: Commit and push updated Excel (if changes exist)
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git add PMD_Max_Temperatures.xlsx
-          git commit -m "Update PMD Max Temperatures - $(date)" || echo "No changes to commit"
-          git push
+          
+          # Only commit if the Excel file actually exists
+          if [ -f "PMD_Max_Temperatures.xlsx" ]; then
+            git add PMD_Max_Temperatures.xlsx
+            git commit -m "Update PMD Max Temperatures - $(date)" || echo "No changes to commit"
+            git push
+          else
+            echo "Excel file not found - skipping commit"
+          fi
         continue-on-error: true
