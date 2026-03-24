@@ -37,12 +37,13 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # This adds both the Excel file and the Screenshot to the "Save" list
-          git add *.xlsx *.png 2>/dev/null || echo "No files to add"
+          # Force add the screenshot and any excel files
+          git add -f *.png *.xlsx 2>/dev/null || echo "No files found to add"
           
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
+          # Check if there is anything to commit
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -m "Auto-update: Data/Screenshot - $(date +'%Y-%m-%d')"
+            git push origin main
           else
-            git commit -m "Auto-update: Data and Screenshot - $(date +'%Y-%m-%d')"
-            git push
+            echo "No changes detected, nothing to push."
           fi
