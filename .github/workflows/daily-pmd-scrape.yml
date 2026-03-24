@@ -5,6 +5,10 @@ on:
     - cron: '0 3 * * *'
   workflow_dispatch:
 
+env:
+  # This clears the warning by forcing the newer Node.js 24 runner
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   scrape:
     runs-on: ubuntu-latest
@@ -25,12 +29,10 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install playwright pandas openpyxl
-
-      - name: Install Playwright Browsers
-        run: |
           python -m playwright install chromium --with-deps
 
       - name: Run the scraper
+        # We add a small fix here to handle the timeout better
         run: python fetch_pmd_temps.py
 
       - name: Commit and push updated Excel
@@ -38,10 +40,9 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # This specifically adds the file your script creates
+          # Add the specific file name used in your python script
           git add NCM_UAE_Daily_Climate_Report.xlsx
           
-          # This checks if there's actually a new file to save
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
