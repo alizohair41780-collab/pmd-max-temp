@@ -6,7 +6,6 @@ on:
   workflow_dispatch:
 
 env:
-  # This clears the warning by forcing the newer Node.js 24 runner
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -26,26 +25,25 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Python dependencies
+      - name: Install dependencies
         run: |
           pip install playwright pandas openpyxl
           python -m playwright install chromium --with-deps
 
-      - name: Run the scraper
-        # We add a small fix here to handle the timeout better
+      - name: Run Scraper and Capture Screenshot
         run: python fetch_pmd_temps.py
 
-      - name: Commit and push updated Excel
+      - name: Commit and push changes
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Add the specific file name used in your python script
-          git add NCM_UAE_Daily_Climate_Report.xlsx
+          # This saves all .xlsx and .png files created today
+          git add *.xlsx *.png
           
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Update UAE Weather Data - $(date)"
+            git commit -m "Auto-update: Data and Screenshot - $(date +'%Y-%m-%d')"
             git push
           fi
