@@ -1,6 +1,6 @@
 import asyncio
 from playwright.async_api import async_playwright
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 
 async def scrape_ncm():
@@ -8,17 +8,16 @@ async def scrape_ncm():
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
         
-        # Set a very tall window to capture the entire table
+        # Set a very tall window for the full table
         await page.set_viewport_size({"width": 1366, "height": 4500})
         
         url = "https://www.ncm.gov.ae/services/climate-reports-daily?lang=en"
         print(f"🔗 Navigating to {url}")
         
         try:
-            # Use domcontentloaded for faster/more reliable access on this heavy site
             await page.goto(url, wait_until="domcontentloaded", timeout=120000)
             
-            print("⏳ Page reached. Waiting 20 seconds for table data...")
+            print("⏳ Page reached. Waiting 20 seconds for data...")
             await asyncio.sleep(20) 
 
             print("🧹 Erasing cookie banners and sticky overlays...")
@@ -40,10 +39,13 @@ async def scrape_ncm():
             
             await asyncio.sleep(2) 
 
-            # --- TIMESTAMP LOGIC ---
-            # This creates a name like: ncm_snapshot_2026-03-25_15-00.png
-            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
-            screenshot_name = f"ncm_snapshot_{timestamp}.png"
+            # --- PAKISTAN TIME CALCULATION ---
+            # GitHub runs on UTC. PKT is UTC + 5 hours.
+            pkt_time = datetime.now() + timedelta(hours=5)
+            
+            # This creates a name like: ncm_snapshot_2026-03-24 (03.00 PM PKT).png
+            timestamp_str = pkt_time.strftime("%Y-%m-%d (%I.%M %p PKT)")
+            screenshot_name = f"ncm_snapshot_{timestamp_str}.png"
             
             print(f"📸 Taking screenshot: {screenshot_name}")
             await page.screenshot(path=screenshot_name, full_page=True)
