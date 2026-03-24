@@ -1,80 +1,63 @@
-from playwright.sync_api import sync_playwright
 import pandas as pd
-from datetime import datetime
-import os
+from playwright.sync_api import sync_playwright
 import time
-
-URL = "https://www.ncm.gov.ae/services/climate-reports-daily?lang=en"
-EXCEL_FILE = "NCM_UAE_Daily_Climate_Report.xlsx"
 
 def scrape_ncm_uae_daily():
     print("🚀 Starting NCM UAE Daily Climate Report Scraper...")
-
+    
     with sync_playwright() as p:
+        # Launch browser
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        )
+        context = browser.new_context(viewport={'width': 1920, 'height': 1080})
         page = context.new_page()
 
-        print(f"Loading NCM UAE Climate Report page...")
-        page.goto(URL, wait_until="networkidle", timeout=90000)
-        time.sleep(8)  # Wait for the big table to fully load
-
-        # Save debug files (helpful if anything goes wrong)
-        page.screenshot(path="debug_screenshot.png", full_page=True)
-        with open("debug_page.html", "w", encoding="utf-8") as f:
-            f.write(page.content())
-        print("📸 Debug files saved (screenshot + HTML)")
-
-        print("Extracting data from the table...")
-
-        # Find all rows in the main table
-        rows = page.locator("table tr").all()
+        URL = "https://www.ncm.gov.ae/services/climate-reports-daily?lang=en"
         
-        data = []
-        report_date = "Unknown Date"
+        try:
+            # 1. Navigate and wait for the main content
+            page.goto(URL, wait_until="domcontentloaded", timeout=120000)
+            
+            # 2. The table is often inside a specific container. 
+            # We wait for the 'Stations' text to appear to ensure the table is loaded.
+            print("Loading NCM UAE Climate Report table...")
+            page.wait_for_selector("table", timeout=60000)
+            
+            # Give it 5 extra seconds for the JavaScript to populate the numbers
+            time.sleep(5)
 
-        for row in rows[1:]:   # Skip header row
-            cells = row.locator("td").all()
-            if len(cells) >= 7:   # Station + Precip + Humidity (3) + Temp (3) + Wind
-                station = cells[0].inner_text().strip()
-                max_temp = cells[5].inner_text().strip()   # Max °C column (adjust if needed)
-                
-                if station and max_temp and station != "Station":
-                    data.append({
-                        "Station": station,
-                        "Max_Temperature_C": max_temp
-                    })
+            # 3. Extract the table rows
+            rows = page.query_selector_all("table tr")
+            data = []
 
-        browser.close()
+            for row in rows:
+                cols = row.query_selector_all("td")
+                if len(cols) > 0:
+                    # Clean the text from each cell
+                    row_data = [col.inner_text().strip() for col in cols]
+                    data.append(row_data)
 
-    if not data:
-        print("❌ No data extracted. Check the debug files.")
-        return
+            # 4. Define Headers based on your screenshot
+            headers = [
+                "No", "Stations", "Precipitation (mm)", 
+                "Min Humidity %", "Max Humidity %", "Avg Humidity %",
+                "Min Temp °C", "Max Temp °C", "Avg Temp °C", "Wind Speed km/h"
+            ]
 
-    print(f"✅ Successfully scraped {len(data)} stations!")
+            # 5. Create DataFrame and Save
+            # We only take rows that have the correct number of columns
+            df = pd.DataFrame([r for r in data if len(r) == 10], columns=headers)
+            
+            filename = "NCM_UAE_Daily_Climate_Report.xlsx"
+            df.to_excel(filename, index=False)
+            
+            print(f"✅ Successfully scraped {len(df)} stations!")
+            print(f"Created file: {filename}")
 
-    # Create DataFrame and add date
-    df = pd.DataFrame(data)
-    today = datetime.now().strftime("%Y-%m-%d")
-    df["Scrape_Date"] = today
-    df["Report_Period"] = report_date
-
-    # Save to Excel
-    if os.path.exists(EXCEL_FILE):
-        with pd.ExcelWriter(EXCEL_FILE, mode='a', if_sheet_exists='new', engine='openpyxl') as writer:
-            df.to_excel(writer, sheet_name=today, index=False)
-        print(f"Appended as new sheet: {today}")
-    else:
-        df.to_excel(EXCEL_FILE, sheet_name=today, index=False)
-        print(f"Created new Excel file: {EXCEL_FILE}")
-
-    # Update "Latest" sheet
-    with pd.ExcelWriter(EXCEL_FILE, mode='a', if_sheet_exists='replace', engine='openpyxl') as writer:
-        df.to_excel(writer, sheet_name="Latest", index=False)
-
-    print("🎉 Scraping completed successfully!")
+        except Exception as e:
+            print(f"❌ Error during scraping: {e}")
+            page.screenshot(path="error_debug.png") # Saves a photo of what went wrong
+        finally:
+            browser.close()
 
 if __name__ == "__main__":
     scrape_ncm_uae_daily()
