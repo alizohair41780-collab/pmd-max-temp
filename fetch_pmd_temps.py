@@ -1,63 +1,59 @@
 import pandas as pd
 from playwright.sync_api import sync_playwright
 import time
+from datetime import datetime
 
-def scrape_ncm_uae_daily():
-    print("🚀 Starting NCM UAE Daily Climate Report Scraper...")
+def scrape_ncm_uae():
+    print("🚀 Starting NCM UAE Scraper...")
     
     with sync_playwright() as p:
-        # Launch browser
+        # Open a browser window
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context(viewport={'width': 1920, 'height': 1080})
+        context = browser.new_context(viewport={'width': 1280, 'height': 2000})
         page = context.new_page()
 
         URL = "https://www.ncm.gov.ae/services/climate-reports-daily?lang=en"
         
         try:
-            # 1. Navigate and wait for the main content
+            # Navigate to the website
             page.goto(URL, wait_until="domcontentloaded", timeout=120000)
             
-            # 2. The table is often inside a specific container. 
-            # We wait for the 'Stations' text to appear to ensure the table is loaded.
-            print("Loading NCM UAE Climate Report table...")
+            # Wait for the table to actually appear on screen
+            print("⏳ Waiting for table to load...")
             page.wait_for_selector("table", timeout=60000)
-            
-            # Give it 5 extra seconds for the JavaScript to populate the numbers
-            time.sleep(5)
+            time.sleep(5)  # Brief pause to let numbers load
 
-            # 3. Extract the table rows
+            # --- CAPTURE SCREENSHOT ---
+            date_str = datetime.now().strftime("%Y-%m-%d")
+            screenshot_name = f"ncm_snapshot_{date_str}.png"
+            page.screenshot(path=screenshot_name, full_page=True)
+            print(f"📸 Screenshot saved as: {screenshot_name}")
+
+            # --- SCRAPE DATA ---
             rows = page.query_selector_all("table tr")
             data = []
-
             for row in rows:
                 cols = row.query_selector_all("td")
-                if len(cols) > 0:
-                    # Clean the text from each cell
+                if len(cols) == 10:
                     row_data = [col.inner_text().strip() for col in cols]
                     data.append(row_data)
 
-            # 4. Define Headers based on your screenshot
+            # Create Excel File
             headers = [
                 "No", "Stations", "Precipitation (mm)", 
                 "Min Humidity %", "Max Humidity %", "Avg Humidity %",
                 "Min Temp °C", "Max Temp °C", "Avg Temp °C", "Wind Speed km/h"
             ]
-
-            # 5. Create DataFrame and Save
-            # We only take rows that have the correct number of columns
-            df = pd.DataFrame([r for r in data if len(r) == 10], columns=headers)
+            df = pd.DataFrame(data, columns=headers)
+            excel_name = f"UAE_Climate_Report_{date_str}.xlsx"
+            df.to_excel(excel_name, index=False)
             
-            filename = "NCM_UAE_Daily_Climate_Report.xlsx"
-            df.to_excel(filename, index=False)
-            
-            print(f"✅ Successfully scraped {len(df)} stations!")
-            print(f"Created file: {filename}")
+            print(f"✅ Scraped {len(df)} stations into {excel_name}")
 
         except Exception as e:
-            print(f"❌ Error during scraping: {e}")
-            page.screenshot(path="error_debug.png") # Saves a photo of what went wrong
+            print(f"❌ Error: {e}")
         finally:
             browser.close()
 
 if __name__ == "__main__":
-    scrape_ncm_uae_daily()
+    scrape_ncm_uae()
