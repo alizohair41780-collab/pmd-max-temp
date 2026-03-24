@@ -2,7 +2,9 @@ name: PMD Temperature Scraper
 
 on:
   schedule:
-    - cron: '0 3 * * *'
+    # 10:00 UTC is 3:00 PM PKT (Pakistan Standard Time)
+    # 15:00 UTC is 8:00 PM PKT (Pakistan Standard Time)
+    - cron: '0 10,15 * * *'
   workflow_dispatch:
 
 env:
@@ -37,14 +39,14 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # This specifically tells git to include the new screenshot file
+          # Force add the new screenshot and any generated excel files
           git add ncm_snapshot_*.png 2>/dev/null || echo "No screenshots found"
           git add *.xlsx 2>/dev/null || echo "No excel files found"
           
-          # Check if there is anything new to upload
+          # Commit only if there are changes (new files)
           if [ -n "$(git status --short)" ]; then
-            git commit -m "Auto-update: Data/Screenshot - $(date +'%Y-%m-%d')"
+            git commit -m "Auto-update: Data/Screenshot - $(date +'%Y-%m-%d %H:%M')"
             git push origin main
           else
-            echo "Nothing new to save."
+            echo "No changes detected, nothing to push."
           fi
