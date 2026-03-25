@@ -2,9 +2,9 @@ name: PMD Temperature Scraper
 
 on:
   schedule:
-    # 10:00 UTC is 3:00 PM PKT (Pakistan Standard Time)
+    # 11:00 UTC is 4:00 PM PKT (Pakistan Standard Time)
     # 15:00 UTC is 8:00 PM PKT (Pakistan Standard Time)
-    - cron: '0 10,15 * * *'
+    - cron: '0 11,15 * * *'
   workflow_dispatch:
 
 env:
