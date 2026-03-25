@@ -2,9 +2,8 @@ name: PMD Temperature Scraper
 
 on:
   schedule:
-    # 11:00 UTC is 4:00 PM PKT
-    # 15:00 UTC is 8:00 PM PKT
-    - cron: '0 11,15 * * *'
+    # Runs every 5 minutes
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 env:
@@ -44,10 +43,14 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Pull latest changes
+          # Pull latest changes to avoid conflicts
           git pull origin main --rebase
           
-          # Add new files
+          # CLEANUP: Remove old screenshots so only the newest one stays
+          # This keeps your repo size small and clean
+          git rm ncm_snapshot_*.png || echo "No old snapshots to remove"
+          
+          # Add the new screenshot and files
           git add .
           
           # Commit and push only if changes exist
