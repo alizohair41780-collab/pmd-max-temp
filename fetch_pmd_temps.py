@@ -5,7 +5,6 @@ import os
 
 async def scrape_ncm():
     async with async_playwright() as p:
-        # Optimized for GitHub Actions resource limits
         browser = await p.chromium.launch(headless=True, args=["--disable-dev-shm-usage"])
         context = await browser.new_context(viewport={"width": 1366, "height": 3000})
         page = await context.new_page()
@@ -14,51 +13,52 @@ async def scrape_ncm():
         print(f"🔗 Navigating to {url}")
         
         try:
-            # Wait for network to settle
-            await page.goto(url, wait_until="networkidle", timeout=120000)
+            # 1. Go to the URL
+            await page.goto(url, wait_until="domcontentloaded", timeout=120000)
             
-            print("⏳ Waiting for table data and cookie banner...")
-            await asyncio.sleep(5) 
-
-            # --- NEW: CLICK THE "I AGREE" BUTTON ---
+            # 2. Wait for the button to exist and click it
+            print("⏳ Searching for cookie button...")
             try:
-                # This looks for the button and clicks it if it exists
-                agree_button = page.get_by_role("button", name="I Agree")
-                if await agree_button.is_visible():
-                    await agree_button.click()
-                    print("✅ Clicked 'I Agree' button.")
-                    await asyncio.sleep(2) # Wait for it to fade out
-            except Exception as e:
-                print(f"⚠️ Could not click button (maybe already gone): {e}")
+                # This waits up to 10 seconds for the button to appear
+                agree_selector = "text='I Agree'"
+                await page.wait_for_selector(agree_selector, timeout=10000)
+                await page.click(agree_selector)
+                print("✅ Button clicked successfully.")
+            except:
+                print("⚠️ Button didn't appear in time, proceeding to manual hide.")
 
-            print("🧹 Force-clearing any remaining overlays...")
-            # This is a backup to remove the dark blur/bar even if the click fails
+            # 3. Extra manual cleaning of the page
+            print("🧹 Hiding all potential overlays...")
             await page.evaluate("""
-                const selectors = [
+                const hideSelectors = [
                     '.cookie-bar', '.cookie-notice', '#cookie-banner', 
                     '.modal-backdrop', '.modal', '.cc-window', '.cc-banner',
-                    '.header', '.footer'
+                    'div[class*="cookie"]', 'div[id*="cookie"]', '.header', '.footer'
                 ];
-                selectors.forEach(s => {
-                    document.querySelectorAll(s).forEach(el => el.remove());
+                hideSelectors.forEach(selector => {
+                    document.querySelectorAll(selector).forEach(el => {
+                        el.style.display = 'none';
+                        el.style.visibility = 'hidden';
+                    });
                 });
-                // Remove the 'blurred' effect if it exists on the body
+                // Force the body to be scrollable and remove blur
                 document.body.style.overflow = 'auto';
+                document.documentElement.style.overflow = 'auto';
             """)
+
+            # Small wait to let the animations finish
+            await asyncio.sleep(3) 
             
-            # --- PKT TIME CALCULATION ---
-            # Using utcnow() + 5 for PKT
+            # 4. Save the file
             pkt_time = datetime.utcnow() + timedelta(hours=5)
             timestamp_str = pkt_time.strftime("%Y-%m-%d (%I.%M %p PKT)")
             screenshot_name = f"ncm_snapshot_{timestamp_str}.png"
             
             print(f"📸 Capturing screenshot: {screenshot_name}")
-            # Focus on the main content area to avoid extra white space
             await page.screenshot(path=screenshot_name, full_page=True)
             
             if os.path.exists(screenshot_name):
-                size = os.path.getsize(screenshot_name)
-                print(f"✅ Success! Saved as {screenshot_name} ({size/1024:.2f} KB)")
+                print(f"✅ Success! Saved as {screenshot_name}")
             
         except Exception as e:
             print(f"❌ Error during scrape: {e}")
