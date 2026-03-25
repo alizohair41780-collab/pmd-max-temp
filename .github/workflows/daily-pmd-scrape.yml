@@ -2,9 +2,9 @@ name: PMD Temperature Scraper
 
 on:
   schedule:
-    # Runs every 5 minutes FOR TESTING (Diagnostic Mode)
-    # Once verified, change this back to '0 11,15 * * *'
-    - cron: '*/5 * * * *'
+    # 11:00 UTC is 4:00 PM PKT
+    # 15:00 UTC is 8:00 PM PKT
+    - cron: '0 11,15 * * *'
   workflow_dispatch:
 
 env:
@@ -44,10 +44,10 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Sync with remote
+          # Pull latest changes
           git pull origin main --rebase
           
-          # Add all new files
+          # Add new files
           git add .
           
           # Commit and push only if changes exist
