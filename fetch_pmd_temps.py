@@ -13,55 +13,49 @@ async def scrape_ncm():
         print(f"🔗 Navigating to {url}")
         
         try:
-            # 1. Go to the URL
             await page.goto(url, wait_until="domcontentloaded", timeout=120000)
             
-            # 2. Wait for the button to exist and click it
-            print("⏳ Searching for cookie button...")
+            # --- 1. DISMISS COOKIES ---
+            print("⏳ Handling cookie banner...")
             try:
-                # This waits up to 10 seconds for the button to appear
-                agree_selector = "text='I Agree'"
-                await page.wait_for_selector(agree_selector, timeout=10000)
-                await page.click(agree_selector)
-                print("✅ Button clicked successfully.")
+                await page.click("text='I Agree'", timeout=5000)
             except:
-                print("⚠️ Button didn't appear in time, proceeding to manual hide.")
+                pass
 
-            # 3. Extra manual cleaning of the page
-            print("🧹 Hiding all potential overlays...")
+            # --- 2. SCROLL TO LOAD ALL DATA ---
+            print("📜 Scrolling to load the full table...")
+            # This scrolls down the page in increments to trigger the website's loading
+            for i in range(10): 
+                await page.mouse.wheel(0, 800)
+                await asyncio.sleep(1) # Give it a second to load the next chunk
+
+            # --- 3. HIDE OVERLAYS ---
+            print("🧹 Cleaning page elements...")
             await page.evaluate("""
                 const hideSelectors = [
                     '.cookie-bar', '.cookie-notice', '#cookie-banner', 
                     '.modal-backdrop', '.modal', '.cc-window', '.cc-banner',
-                    'div[class*="cookie"]', 'div[id*="cookie"]', '.header', '.footer'
+                    'header', 'footer', '.header', '.footer'
                 ];
-                hideSelectors.forEach(selector => {
-                    document.querySelectorAll(selector).forEach(el => {
-                        el.style.display = 'none';
-                        el.style.visibility = 'hidden';
-                    });
+                hideSelectors.forEach(s => {
+                    document.querySelectorAll(s).forEach(el => el.style.display = 'none');
                 });
-                // Force the body to be scrollable and remove blur
-                document.body.style.overflow = 'auto';
-                document.documentElement.style.overflow = 'auto';
             """)
 
-            # Small wait to let the animations finish
-            await asyncio.sleep(3) 
-            
-            # 4. Save the file
+            # --- 4. TAKE SCREENSHOT ---
             pkt_time = datetime.utcnow() + timedelta(hours=5)
             timestamp_str = pkt_time.strftime("%Y-%m-%d (%I.%M %p PKT)")
             screenshot_name = f"ncm_snapshot_{timestamp_str}.png"
             
-            print(f"📸 Capturing screenshot: {screenshot_name}")
+            print(f"📸 Capturing full page...")
+            # full_page=True works better once we have scrolled down manually
             await page.screenshot(path=screenshot_name, full_page=True)
             
             if os.path.exists(screenshot_name):
-                print(f"✅ Success! Saved as {screenshot_name}")
+                print(f"✅ Success! Full table saved as {screenshot_name}")
             
         except Exception as e:
-            print(f"❌ Error during scrape: {e}")
+            print(f"❌ Error: {e}")
         finally:
             await browser.close()
 
