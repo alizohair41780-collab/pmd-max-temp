@@ -2,8 +2,8 @@ name: PMD Temperature Scraper
 
 on:
   schedule:
-    # 12:00 UTC is 5:00 PM PKT (Pakistan Standard Time)
-    # 15:00 UTC is 8:00 PM PKT (Pakistan Standard Time)
+    # 12:00 UTC is 5:00 PM PKT
+    # 15:00 UTC is 8:00 PM PKT
     - cron: '0 11,15 * * *'
   workflow_dispatch:
 
@@ -20,7 +20,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Fetches all history so git push works better
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -44,13 +44,13 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Pull latest changes to avoid conflicts during scheduled runs
+          # Sync with remote to avoid conflicts
           git pull origin main --rebase
           
-          # Add specifically by pattern
-          git add ncm_snapshot_*.png *.xlsx 2>/dev/null || echo "No new files to add"
+          # Add all new files (handles spaces and parentheses in filenames)
+          git add .
           
-          # Check for changes and push
+          # Commit and push only if changes exist
           if [[ -n "$(git status --short)" ]]; then
             git commit -m "Auto-update: Data/Screenshot - $(date +'%Y-%m-%d %H:%M')"
             git push origin main
