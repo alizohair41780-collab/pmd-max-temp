@@ -2,7 +2,7 @@ name: PMD Temperature Scraper
 
 on:
   schedule:
-    # 11:00 UTC is 4:00 PM PKT (Pakistan Standard Time)
+    # 12:00 UTC is 5:00 PM PKT (Pakistan Standard Time)
     # 15:00 UTC is 8:00 PM PKT (Pakistan Standard Time)
     - cron: '0 11,15 * * *'
   workflow_dispatch:
@@ -19,6 +19,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetches all history so git push works better
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -27,11 +29,14 @@ jobs:
 
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install playwright pandas openpyxl
           python -m playwright install chromium --with-deps
 
       - name: Run Scraper
         run: python fetch_pmd_temps.py
+        env:
+          PYTHONUNBUFFERED: "1"
 
       - name: Save Results
         if: always()
@@ -39,12 +44,14 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Force add the new screenshot and any generated excel files
-          git add ncm_snapshot_*.png 2>/dev/null || echo "No screenshots found"
-          git add *.xlsx 2>/dev/null || echo "No excel files found"
+          # Pull latest changes to avoid conflicts during scheduled runs
+          git pull origin main --rebase
           
-          # Commit only if there are changes (new files)
-          if [ -n "$(git status --short)" ]; then
+          # Add specifically by pattern
+          git add ncm_snapshot_*.png *.xlsx 2>/dev/null || echo "No new files to add"
+          
+          # Check for changes and push
+          if [[ -n "$(git status --short)" ]]; then
             git commit -m "Auto-update: Data/Screenshot - $(date +'%Y-%m-%d %H:%M')"
             git push origin main
           else
