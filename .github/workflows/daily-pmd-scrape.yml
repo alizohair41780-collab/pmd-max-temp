@@ -1,9 +1,10 @@
 name: PMD Temperature Scraper
 
 on:
-  schedule:
-    # Runs every 5 minutes
-    - cron: '*/5 * * * *'
+  # This is the "Ear" that listens for your Cron-job.org signal
+  repository_dispatch:
+    types: [trigger_scrape]
+  # This keeps your manual "Run workflow" button active
   workflow_dispatch:
 
 env:
