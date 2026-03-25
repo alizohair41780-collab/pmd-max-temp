@@ -49,7 +49,6 @@ jobs:
           
           # CLEANUP: Remove old screenshots so only the newest one stays
           # This keeps your repo size small and clean
-          git rm ncm_snapshot_*.png || echo "No old snapshots to remove"
           
           # Add the new screenshot and files
           git add .
