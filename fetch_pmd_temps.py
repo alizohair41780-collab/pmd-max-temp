@@ -7,19 +7,19 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-# --- UPDATED FOLDER ID FROM YOUR URL ---
-# URL: https://drive.google.com/drive/folders/1LtTNFcK85lDexO9ZQjGArlIdhUaeFBy5
+# --- VERIFIED FOLDER ID ---
+# Exact match for: https://drive.google.com/drive/folders/1LtTNFcK85lDexO9ZQjGArlIdhUaeFBy5
 FOLDER_ID = "1LtTNFcK85lDexO9ZQjGArlIdhUaeFBy5" 
 
 def upload_to_drive(file_path):
     print(f"🚀 Initializing Google Drive Upload...")
     try:
         if "GDRIVE_SERVICE_ACCOUNT_KEY" not in os.environ:
-            print("❌ ERROR: Secrets not found!")
+            print("❌ ERROR: GDRIVE_SERVICE_ACCOUNT_KEY not found in GitHub Secrets!")
             return
 
         service_account_info = json.loads(os.environ["GDRIVE_SERVICE_ACCOUNT_KEY"])
-        print(f"👤 Acting as Service Account: {service_account_info.get('client_email')}")
+        print(f"👤 Uploading as: {service_account_info.get('client_email')}")
         
         scopes = ['https://www.googleapis.com/auth/drive']
         credentials = service_account.Credentials.from_service_account_info(
@@ -36,7 +36,7 @@ def upload_to_drive(file_path):
         
         media = MediaFileUpload(file_path, mimetype='application/pdf', resumable=True)
         
-        # supportsAllDrives=True is required since the folder is "Shared with me"
+        # supportsAllDrives=True is essential for folders shared with the service account
         file = service.files().create(
             body=file_metadata,
             media_body=media,
@@ -44,7 +44,7 @@ def upload_to_drive(file_path):
             supportsAllDrives=True 
         ).execute()
         
-        print(f"✅ SUCCESS! File is now in Drive.")
+        print(f"✅ SUCCESS: {file.get('name')} uploaded to Drive.")
         print(f"🆔 File ID: {file.get('id')}")
 
     except Exception as e:
@@ -57,20 +57,20 @@ async def scrape_ncm_to_pdf():
         page = await context.new_page()
         
         url = "https://www.ncm.gov.ae/services/climate-reports-daily?lang=en"
-        print(f"🔗 Navigating to NCM...")
+        print(f"🔗 Accessing NCM Weather Portal...")
         
         try:
             await page.goto(url, wait_until="domcontentloaded", timeout=180000)
             await asyncio.sleep(15) 
 
-            # Remove website clutter
+            # Clean page layout
             await page.evaluate("document.querySelectorAll('header, footer, .cookie-bar').forEach(el => el.remove())")
 
-            # Timestamp for filename (Pakistan Standard Time)
+            # Filename with Pakistan Standard Time
             pkt_now = datetime.utcnow() + timedelta(hours=5)
             pdf_name = f"ncm_report_{pkt_now.strftime('%Y-%m-%d_%H-%M')}_PKT.pdf"
             
-            print(f"📄 Generating PDF...")
+            print(f"📄 Creating PDF: {pdf_name}")
             await page.pdf(path=pdf_name, format="A4", print_background=True)
             
             if os.path.exists(pdf_name):
