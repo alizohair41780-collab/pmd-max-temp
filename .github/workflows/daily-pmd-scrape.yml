@@ -47,16 +47,18 @@ jobs:
           # Pull latest changes to avoid conflicts
           git pull origin main --rebase
           
-          # CLEANUP: Remove old screenshots so only the newest one stays
-          # This keeps your repo size small and clean
+          # CLEANUP: Remove old screenshots and PDFs to keep it clean
+          # This ensures only the LATEST PDF is visible in your folder
+          git rm *.png || echo "No images to delete"
+          git rm *.pdf || echo "No old PDFs to delete"
           
-          # Add the new screenshot and files
-          git add .
+          # Add the new PDF report
+          git add *.pdf
           
-          # Commit and push only if changes exist
+          # Commit and push only if the new PDF exists
           if [[ -n "$(git status --short)" ]]; then
-            git commit -m "Auto-update: Data/Screenshot - $(date +'%Y-%m-%d %H:%M')"
+            git commit -m "Weather PDF Update: $(date +'%Y-%m-%d %H:%M')"
             git push origin main
           else
-            echo "No changes detected, nothing to push."
+            echo "No new PDF detected, nothing to push."
           fi
