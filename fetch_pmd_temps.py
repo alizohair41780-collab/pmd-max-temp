@@ -7,110 +7,75 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-# --- GOOGLE DRIVE SETTINGS ---
-# Note: If you want files to go directly inside the "2026" folder, 
-# make sure this ID matches the one in your URL when you are INSIDE that folder.
-FOLDER_ID = "1wN8BNnwAYOLspRmlBGnxfH5vaUsMfbWL"
+# --- UPDATED 2026 FOLDER ID ---
+FOLDER_ID = "1LtTNFcK85IDexO9ZQjGArlldhUaeFBy5" 
 
 def upload_to_drive(file_path):
-    print(f"🚀 Preparing to upload {file_path} to Google Drive...")
+    print(f"🚀 Initializing Google Drive Upload...")
     try:
-        # Load the secret key from GitHub environment
-        if "GDRIVE_SERVICE_ACCOUNT_KEY" not in os.environ:
-            print("❌ Error: GDRIVE_SERVICE_ACCOUNT_KEY not found in Environment Variables!")
-            return
-
         service_account_info = json.loads(os.environ["GDRIVE_SERVICE_ACCOUNT_KEY"])
         credentials = service_account.Credentials.from_service_account_info(service_account_info)
-        
         service = build('drive', 'v3', credentials=credentials)
         
+        # We target the 2026 folder directly
         file_metadata = {
             'name': os.path.basename(file_path),
             'parents': [FOLDER_ID]
         }
         
-        # Using resumable=True helps with larger PDF files
         media = MediaFileUpload(file_path, mimetype='application/pdf', resumable=True)
         
         file = service.files().create(
-            body=file_metadata, 
-            media_body=media, 
+            body=file_metadata,
+            media_body=media,
             fields='id, name, parents'
         ).execute()
         
-        print(f"✅ Success! File uploaded to Drive.")
-        print(f"📄 File Name: {file.get('name')}")
+        print(f"✅ SUCCESS: {file.get('name')} is now in your 2026 folder.")
         print(f"🆔 File ID: {file.get('id')}")
-        print(f"📍 Parent Folder: {file.get('parents')}")
 
     except Exception as e:
-        print(f"❌ Drive Upload Error: {e}")
+        print(f"❌ DRIVE ERROR: {e}")
 
 async def scrape_ncm_to_pdf():
     async with async_playwright() as p:
-        # Launching browser
-        browser = await p.chromium.launch(headless=True, args=["--disable-dev-shm-usage"])
+        # Launching with stability args
+        browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
         context = await browser.new_context(viewport={"width": 1280, "height": 1000})
         page = await context.new_page()
         
         url = "https://www.ncm.gov.ae/services/climate-reports-daily?lang=en"
-        print(f"🔗 Navigating to {url}")
+        print(f"🔗 Connecting to NCM UAE Weather Portal...")
         
         try:
-            # Increase timeout for slow loading weather data
-            await page.goto(url, wait_until="networkidle", timeout=120000)
+            # Using domcontentloaded to prevent timeout on slow government servers
+            await page.goto(url, wait_until="domcontentloaded", timeout=180000)
             
-            # --- 1. DISMISS COOKIES ---
-            print("⏳ Handling cookie banner...")
-            try:
-                await page.click("text='I Agree'", timeout=10000)
-                await asyncio.sleep(2)
-            except:
-                print("⚠️ Cookie banner not found or already closed.")
+            print("⏳ Loading weather data table...")
+            await asyncio.sleep(15) # Wait for JavaScript to render the rows
 
-            # --- 2. SCROLL TO LOAD ALL WEATHER STATIONS ---
-            print("📜 Scrolling to load data rows...")
-            for _ in range(15): 
-                await page.mouse.wheel(0, 800)
-                await asyncio.sleep(0.5)
-
-            # --- 3. CLEAN PAGE FOR PDF ---
-            print("🧹 Removing website headers/footers for a clean report...")
+            # Clean the page by removing clutter
             await page.evaluate("""
-                const selectors = [
-                    'header', 'footer', '.header', '.footer', 
-                    '.cookie-bar', '.cc-window', '#top-nav', 
-                    '.modal-backdrop', '.breadcrumb'
-                ];
-                selectors.forEach(s => {
-                    document.querySelectorAll(s).forEach(el => el.style.display = 'none');
-                });
+                document.querySelectorAll('header, footer, .cookie-bar, .header, .footer, #top-nav').forEach(el => el.remove());
             """)
 
-            # --- 4. GENERATE FILENAME (PKT) ---
+            # Time formatting for filename (Pakistan Standard Time)
             pkt_now = datetime.utcnow() + timedelta(hours=5)
-            timestamp_str = pkt_now.strftime("%Y-%m-%d (%I.%M %p PKT)")
-            pdf_name = f"ncm_report_{timestamp_str}.pdf"
+            pdf_name = f"ncm_report_{pkt_now.strftime('%Y-%m-%d_%H-%M-%S')}_PKT.pdf"
             
-            # --- 5. CREATE PDF ---
-            print(f"📄 Generating Copyable PDF: {pdf_name}")
-            # format="A4" ensures it fits standard document sizes
+            print(f"📄 Creating publication-ready PDF...")
             await page.pdf(
                 path=pdf_name, 
                 format="A4", 
                 print_background=True,
-                margin={"top": "20px", "bottom": "20px", "left": "20px", "right": "20px"}
+                margin={"top": "1cm", "bottom": "1cm", "left": "1cm", "right": "1cm"}
             )
             
-            # --- 6. UPLOAD ---
             if os.path.exists(pdf_name):
                 upload_to_drive(pdf_name)
-            else:
-                print("❌ PDF was not created locally.")
             
         except Exception as e:
-            print(f"❌ Scraper Error: {e}")
+            print(f"❌ SCRAPE ERROR: {e}")
         finally:
             await browser.close()
 
