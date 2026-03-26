@@ -8,13 +8,24 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 # --- TARGETING YOUR 2026 FOLDER ---
-FOLDER_ID = "1LtTNFcK85IDexO9ZQjGArlldhUaeFBy5"
+FOLDER_ID = "1LtTNFcK85IDexO9ZQjGArlIdhUaeFBy5" 
 
 def upload_to_drive(file_path):
-    print(f"🚀 Starting Drive upload process...")
+    print(f"🚀 Initializing Google Drive Upload...")
     try:
+        if "GDRIVE_SERVICE_ACCOUNT_KEY" not in os.environ:
+            print("❌ ERROR: GDRIVE_SERVICE_ACCOUNT_KEY not found in GitHub Secrets!")
+            return
+
         service_account_info = json.loads(os.environ["GDRIVE_SERVICE_ACCOUNT_KEY"])
-        credentials = service_account.Credentials.from_service_account_info(service_account_info)
+        
+        # SCOPES: Explicitly requesting full Drive access to see shared folders
+        scopes = ['https://www.googleapis.com/auth/drive']
+        credentials = service_account.Credentials.from_service_account_info(
+            service_account_info, 
+            scopes=scopes
+        )
+        
         service = build('drive', 'v3', credentials=credentials)
         
         file_metadata = {
@@ -22,46 +33,61 @@ def upload_to_drive(file_path):
             'parents': [FOLDER_ID]
         }
         
-        media = MediaFileUpload(file_path, mimetype='application/pdf')
+        media = MediaFileUpload(file_path, mimetype='application/pdf', resumable=True)
         
-        # We add 'supportsAllDrives=True' to ensure it can write to shared folders
+        # supportsAllDrives=True: CRITICAL for folders shared with the Service Account
         file = service.files().create(
             body=file_metadata,
             media_body=media,
-            fields='id, parents',
+            fields='id, name, parents',
             supportsAllDrives=True 
         ).execute()
         
-        print(f"✅ Success! File ID: {file.get('id')}")
-        
+        print(f"✅ SUCCESS: {file.get('name')} is now in your 2026 folder.")
+        print(f"🆔 File ID: {file.get('id')}")
+
     except Exception as e:
         print(f"❌ DRIVE ERROR: {e}")
 
 async def scrape_ncm_to_pdf():
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        # Launching with stability arguments for GitHub Actions
+        browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
         context = await browser.new_context(viewport={"width": 1280, "height": 1000})
         page = await context.new_page()
         
         url = "https://www.ncm.gov.ae/services/climate-reports-daily?lang=en"
-        print(f"🔗 Navigating to NCM...")
+        print(f"🔗 Connecting to NCM UAE Weather Portal...")
         
         try:
+            # wait_until="domcontentloaded" is faster for slow government servers
             await page.goto(url, wait_until="domcontentloaded", timeout=180000)
-            await asyncio.sleep(15) # Allow data to load
-
-            # Remove clutter for clean PDF
-            await page.evaluate("document.querySelectorAll('header, footer, .cookie-bar').forEach(el => el.remove())")
-
-            # Filename with PKT time
-            pkt_now = datetime.utcnow() + timedelta(hours=5)
-            pdf_name = f"ncm_report_{pkt_now.strftime('%Y-%m-%d_%H-%M')}.pdf"
             
-            print(f"📄 Generating PDF...")
-            await page.pdf(path=pdf_name, format="A4", print_background=True)
+            print("⏳ Waiting 15 seconds for weather table to render...")
+            await asyncio.sleep(15) 
+
+            # Clean the page for a professional report
+            await page.evaluate("""
+                document.querySelectorAll('header, footer, .cookie-bar, .header, .footer, #top-nav').forEach(el => el.remove());
+            """)
+
+            # Filename with Pakistan Standard Time (PKT)
+            pkt_now = datetime.utcnow() + timedelta(hours=5)
+            timestamp = pkt_now.strftime('%Y-%m-%d_%H-%M-%S')
+            pdf_name = f"ncm_report_{timestamp}_PKT.pdf"
+            
+            print(f"📄 Creating PDF: {pdf_name}")
+            await page.pdf(
+                path=pdf_name, 
+                format="A4", 
+                print_background=True,
+                margin={"top": "1cm", "bottom": "1cm", "left": "1cm", "right": "1cm"}
+            )
             
             if os.path.exists(pdf_name):
                 upload_to_drive(pdf_name)
+            else:
+                print("❌ PDF creation failed locally.")
             
         except Exception as e:
             print(f"❌ SCRAPE ERROR: {e}")
