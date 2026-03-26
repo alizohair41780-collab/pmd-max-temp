@@ -1,10 +1,10 @@
 name: PMD Temperature Scraper
 
 on:
-  # This is the "Ear" that listens for your Cron-job.org signal
+  # Listen for Cron-job.org
   repository_dispatch:
     types: [trigger_scrape]
-  # This keeps your manual "Run workflow" button active
+  # Manual run button
   workflow_dispatch:
 
 env:
@@ -30,35 +30,36 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install playwright pandas openpyxl
+          # Added the Google libraries here
+          pip install playwright google-api-python-client google-auth pandas openpyxl
           python -m playwright install chromium --with-deps
 
       - name: Run Scraper
         run: python fetch_pmd_temps.py
         env:
+          # This connects your GitHub Secret to the Python script
+          GDRIVE_SERVICE_ACCOUNT_KEY: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_KEY }}
           PYTHONUNBUFFERED: "1"
 
-      - name: Save Results
+      - name: Save Results (GitHub Backup)
         if: always()
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Pull latest changes to avoid conflicts
+          # Pull latest to avoid errors
           git pull origin main --rebase
           
-          # CLEANUP: Remove old screenshots and PDFs to keep it clean
-          # This ensures only the LATEST PDF is visible in your folder
+          # Clean up old local files
           git rm *.png || echo "No images to delete"
           git rm *.pdf || echo "No old PDFs to delete"
           
-          # Add the new PDF report
-          git add *.pdf
+          # Add the new PDF that was just generated
+          git add *.pdf || echo "No PDF found to add"
           
-          # Commit and push only if the new PDF exists
           if [[ -n "$(git status --short)" ]]; then
-            git commit -m "Weather PDF Update: $(date +'%Y-%m-%d %H:%M')"
+            git commit -m "Auto-update: New PDF generated and uploaded to Drive"
             git push origin main
           else
-            echo "No new PDF detected, nothing to push."
+            echo "No changes detected."
           fi
