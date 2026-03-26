@@ -8,6 +8,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 # --- TARGETING YOUR 2026 FOLDER ---
+# This ID matches your URL: https://drive.google.com/drive/folders/1LtTNFcK85lDexO9ZQjGArlIdhUaeFBy5
 FOLDER_ID = "1LtTNFcK85lDexO9ZQjGArlIdhUaeFBy5" 
 
 def upload_to_drive(file_path):
@@ -19,7 +20,7 @@ def upload_to_drive(file_path):
 
         service_account_info = json.loads(os.environ["GDRIVE_SERVICE_ACCOUNT_KEY"])
         
-        # SCOPES: Explicitly requesting full Drive access to see shared folders
+        # SCOPES: Explicitly requesting full Drive access to see folders shared with the account
         scopes = ['https://www.googleapis.com/auth/drive']
         credentials = service_account.Credentials.from_service_account_info(
             service_account_info, 
@@ -51,7 +52,7 @@ def upload_to_drive(file_path):
 
 async def scrape_ncm_to_pdf():
     async with async_playwright() as p:
-        # Launching with stability arguments for GitHub Actions
+        # Stability arguments for running in a GitHub Actions environment
         browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
         context = await browser.new_context(viewport={"width": 1280, "height": 1000})
         page = await context.new_page()
@@ -60,13 +61,13 @@ async def scrape_ncm_to_pdf():
         print(f"🔗 Connecting to NCM UAE Weather Portal...")
         
         try:
-            # wait_until="domcontentloaded" is faster for slow government servers
+            # domcontentloaded helps avoid timeouts on slow government servers
             await page.goto(url, wait_until="domcontentloaded", timeout=180000)
             
-            print("⏳ Waiting 15 seconds for weather table to render...")
+            print("⏳ Waiting for weather data table to render...")
             await asyncio.sleep(15) 
 
-            # Clean the page for a professional report
+            # Clean the page by removing headers/footers for a better PDF
             await page.evaluate("""
                 document.querySelectorAll('header, footer, .cookie-bar, .header, .footer, #top-nav').forEach(el => el.remove());
             """)
@@ -87,7 +88,7 @@ async def scrape_ncm_to_pdf():
             if os.path.exists(pdf_name):
                 upload_to_drive(pdf_name)
             else:
-                print("❌ PDF creation failed locally.")
+                print("❌ PDF creation failed locally on the GitHub server.")
             
         except Exception as e:
             print(f"❌ SCRAPE ERROR: {e}")
