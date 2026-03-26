@@ -8,7 +8,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 # --- TARGETING YOUR 2026 FOLDER ---
-FOLDER_ID = "1LtTNFcK85IDexO9ZQjGArlIdhUaeFBy5" 
+FOLDER_ID = "1LtTNFcK85lDexO9ZQjGArlIdhUaeFBy5" 
 
 def upload_to_drive(file_path):
     print(f"🚀 Initializing Google Drive Upload...")
