@@ -7,11 +7,11 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-# VERIFIED FOLDER ID
-FOLDER_ID = "1LtTNFcK85lDexO9ZQjGArlIdhUaeFBy5"
+# YOUR PERSONAL EMAIL
+USER_EMAIL = "alizohair3173@gmail.com"
 
 def upload_to_drive(file_path):
-    print(f"🚀 Initializing Quota-Bypass Upload...")
+    print(f"🚀 Initializing Hand-off Upload...")
     try:
         service_account_info = json.loads(os.environ["GDRIVE_SERVICE_ACCOUNT_KEY"])
         credentials = service_account.Credentials.from_service_account_info(
@@ -20,31 +20,29 @@ def upload_to_drive(file_path):
         )
         service = build('drive', 'v3', credentials=credentials)
         
-        # We set the 'viewersCanCopyContent' to False and 'writersCanShare' to True
-        # This forces the API to treat the destination folder's owner as the storage payer.
-        file_metadata = {
-            'name': os.path.basename(file_path),
-            'parents': [FOLDER_ID],
-            'copyRequiresWriterPermission': False
-        }
-        
+        file_metadata = {'name': os.path.basename(file_path)}
         media = MediaFileUpload(file_path, mimetype='application/pdf', resumable=False)
         
-        # CRITICAL: We use 'supportsAllDrives=True' and a simplified 'fields' request
+        # Step 1: Create the file in the service account's space
         file = service.files().create(
             body=file_metadata,
             media_body=media,
-            fields='id',
-            supportsAllDrives=True 
+            fields='id'
         ).execute()
-        
-        print(f"✅ SUCCESS! File ID: {file.get('id')}")
+        file_id = file.get('id')
+        print(f"✅ Created File ID: {file_id}")
+
+        # Step 2: Share it with your personal email immediately
+        permission = {
+            'type': 'user',
+            'role': 'writer',
+            'emailAddress': USER_EMAIL
+        }
+        service.permissions().create(fileId=file_id, body=permission).execute()
+        print(f"📧 Permission granted to {USER_EMAIL}. Check 'Shared with me'!")
 
     except Exception as e:
         print(f"❌ DRIVE ERROR: {e}")
-        if "storageQuotaExceeded" in str(e):
-            print("💡 TIP: The Service Account is still being blocked by quota.")
-            print("Go to Google Drive > Right click '2026' folder > Share > Set Service Account to OWNER if possible.")
 
 async def scrape_ncm_to_pdf():
     async with async_playwright() as p:
@@ -54,10 +52,8 @@ async def scrape_ncm_to_pdf():
             url = "https://www.ncm.gov.ae/services/climate-reports-daily?lang=en"
             await page.goto(url, wait_until="domcontentloaded", timeout=120000)
             await asyncio.sleep(15)
-            
-            # Clean page
             await page.evaluate("document.querySelectorAll('header, footer, .cookie-bar').forEach(el => el.remove())")
-
+            
             pkt_now = datetime.utcnow() + timedelta(hours=5)
             pdf_name = f"ncm_report_{pkt_now.strftime('%Y-%m-%d_%H-%M')}_PKT.pdf"
             await page.pdf(path=pdf_name, format="A4", print_background=True)
