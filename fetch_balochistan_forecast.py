@@ -1,6 +1,5 @@
 import asyncio
 from playwright.async_api import async_playwright
-import playwright_stealth
 from datetime import datetime, timedelta
 import os
 import json
@@ -8,7 +7,6 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-# YOUR PERSONAL EMAIL
 USER_EMAIL = "alizohair3173@gmail.com"
 
 def upload_to_drive(file_path):
@@ -20,71 +18,53 @@ def upload_to_drive(file_path):
             scopes=['https://www.googleapis.com/auth/drive']
         )
         service = build('drive', 'v3', credentials=credentials)
-        
         file_metadata = {'name': os.path.basename(file_path)}
         media = MediaFileUpload(file_path, mimetype='application/pdf', resumable=False)
-        
-        file = service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields='id'
-        ).execute()
-        
+        file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
         file_id = file.get('id')
-        print(f"✅ File Created! ID: {file_id}")
-
         service.permissions().create(
             fileId=file_id,
             body={'type': 'user', 'role': 'owner', 'emailAddress': USER_EMAIL},
             transferOwnership=True
         ).execute()
-        
-        print(f"📧 Ownership transferred to {USER_EMAIL}.")
-
+        print(f"✅ Ownership transferred to {USER_EMAIL}.")
     except Exception as e:
         print(f"❌ DRIVE ERROR: {e}")
 
 async def scrape_pmd_balochistan():
     async with async_playwright() as p:
-        # Launching with automation-hiding flags
+        # We use standard args that are proven to work without the stealth library
         browser = await p.chromium.launch(headless=True, args=[
             "--no-sandbox", 
             "--disable-dev-shm-usage",
             "--disable-blink-features=AutomationControlled"
         ])
         
+        # A very common user agent
         user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         
         context = await browser.new_context(
             viewport={"width": 1280, "height": 1600},
-            user_agent=user_agent,
-            extra_http_headers={
-                "Accept-Language": "en-US,en;q=0.9",
-                "Connection": "keep-alive"
-            }
+            user_agent=user_agent
         )
         
         page = await context.new_page()
         
-        # FIXED: Using the async-compatible stealth method
-        await playwright_stealth.stealth_async(page)
+        # Manual Stealth: Hide the 'webdriver' flag that sites check for
+        await page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         
         url = "https://rmcbalochistan.pmd.gov.pk/www/dailyforecast.php"
-        print(f"🔗 Attempting Stealth Connection to PMD Balochistan...")
+        print(f"🔗 Connecting to PMD Balochistan...")
         
         try:
-            # Visit Google first
-            await page.goto("https://www.google.com", wait_until="domcontentloaded")
-            await asyncio.sleep(5)
-            
-            print(f"🛰️ Navigating to target site...")
+            # Go directly to the URL
             await page.goto(url, wait_until="domcontentloaded", timeout=180000)
             
-            # Wait for firewall clearance
-            print(f"⏳ Waiting 55 seconds for firewall clearance...")
-            await asyncio.sleep(55) 
+            # This is the most important part: give the firewall time to let you in
+            print(f"⏳ Waiting 60 seconds for the 'Security Check' to pass automatically...")
+            await asyncio.sleep(60) 
 
-            # Filename generation
+            # PST Timestamp
             pkt_now = datetime.utcnow() + timedelta(hours=5)
             pdf_name = f"balochistan_forecast_{pkt_now.strftime('%Y-%m-%d_%H-%M')}_PKT.pdf"
             
