@@ -13,7 +13,6 @@ USER_EMAIL = "alizohair3173@gmail.com"
 def upload_to_drive(file_path):
     print(f"🚀 Initializing Google Drive Upload...")
     try:
-        # Get credentials from GitHub Secrets
         service_account_info = json.loads(os.environ["GDRIVE_SERVICE_ACCOUNT_KEY"])
         credentials = service_account.Credentials.from_service_account_info(
             service_account_info, 
@@ -22,11 +21,8 @@ def upload_to_drive(file_path):
         service = build('drive', 'v3', credentials=credentials)
         
         file_metadata = {'name': os.path.basename(file_path)}
-        
-        # resumable=False is used for service account reliability
         media = MediaFileUpload(file_path, mimetype='application/pdf', resumable=False)
         
-        # Create the file in the Service Account's "temporary" space
         file = service.files().create(
             body=file_metadata,
             media_body=media,
@@ -36,48 +32,65 @@ def upload_to_drive(file_path):
         file_id = file.get('id')
         print(f"✅ File Created! ID: {file_id}")
 
-        # TRANSFER OWNERSHIP: Moves storage cost and visibility to YOUR email
         service.permissions().create(
             fileId=file_id,
             body={'type': 'user', 'role': 'owner', 'emailAddress': USER_EMAIL},
             transferOwnership=True
         ).execute()
         
-        print(f"📧 Ownership transferred to {USER_EMAIL}. Check your 'My Drive'!")
+        print(f"📧 Ownership transferred to {USER_EMAIL}.")
 
     except Exception as e:
         print(f"❌ DRIVE ERROR: {e}")
 
 async def scrape_pmd_balochistan():
     async with async_playwright() as p:
-        # Optimized launch arguments for GitHub Actions environment
+        # Launching Chromium with no-sandbox for GitHub Actions compatibility
         browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
-        context = await browser.new_context(viewport={"width": 1280, "height": 1600})
+        
+        # STEALTH SETTINGS: Imitating a real Windows Chrome browser
+        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        
+        context = await browser.new_context(
+            viewport={"width": 1280, "height": 1600},
+            user_agent=user_agent,
+            extra_http_headers={
+                "Accept-Language": "en-US,en;q=0.9",
+                "Referer": "https://www.google.com/",
+                "Connection": "keep-alive"
+            }
+        )
         page = await context.new_page()
         
         url = "https://rmcbalochistan.pmd.gov.pk/www/dailyforecast.php"
-        print(f"🔗 Connecting to PMD Balochistan (Waiting up to 3 mins)...")
+        print(f"🔗 Connecting to PMD Balochistan (Security Bypass Mode)...")
         
         try:
-            # wait_until="domcontentloaded" is better for slow gov servers than "networkidle"
-            await page.goto(url, wait_until="domcontentloaded", timeout=180000)
+            # networkidle ensures we wait for the security check/redirects to finish
+            await page.goto(url, wait_until="networkidle", timeout=180000)
             
-            # Explicit wait to let the dynamic table load its data
-            print(f"⏳ Page structure loaded. Waiting 15s for data rendering...")
-            await asyncio.sleep(15) 
+            # Additional wait to ensure the table content renders after verification
+            print(f"⏳ Verification check processing... waiting 25s for data.")
+            await asyncio.sleep(25) 
 
-            # Timestamp for PKT (UTC+5)
+            # Check if we successfully left the security page
+            content = await page.content()
+            if "security verification" in content.lower():
+                print("⚠️ Security wall still active. Waiting an extra 20s...")
+                await asyncio.sleep(20)
+
+            # Generate Filename (PKT Time)
             pkt_now = datetime.utcnow() + timedelta(hours=5)
             pdf_name = f"balochistan_forecast_{pkt_now.strftime('%Y-%m-%d_%H-%M')}_PKT.pdf"
             
-            print(f"📄 Generating PDF: {pdf_name}")
-            # print_background=True ensures table colors/borders are captured
+            print(f"📄 Capturing PDF: {pdf_name}")
+            # full_page=True is helpful for long forecast tables
             await page.pdf(path=pdf_name, format="A4", print_background=True)
             
             if os.path.exists(pdf_name):
                 upload_to_drive(pdf_name)
             else:
-                print("❌ PDF generation failed: File not found on disk.")
+                print("❌ PDF generation failed.")
             
         except Exception as e:
             print(f"❌ SCRAPE ERROR: {e}")
