@@ -1,7 +1,6 @@
 import asyncio
 from playwright.async_api import async_playwright
-# MODIFIED IMPORT
-from playwright_stealth import stealth_async
+import playwright_stealth
 from datetime import datetime, timedelta
 import os
 import json
@@ -54,7 +53,6 @@ async def scrape_pmd_balochistan():
             "--disable-blink-features=AutomationControlled"
         ])
         
-        # Windows-based User Agent
         user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         
         context = await browser.new_context(
@@ -68,24 +66,23 @@ async def scrape_pmd_balochistan():
         
         page = await context.new_page()
         
-        # FIXED: Correct stealth usage for Async Playwright
-        await stealth_async(page)
+        # FIXED: Using the async-compatible stealth method
+        await playwright_stealth.stealth_async(page)
         
         url = "https://rmcbalochistan.pmd.gov.pk/www/dailyforecast.php"
         print(f"🔗 Attempting Stealth Connection to PMD Balochistan...")
         
         try:
-            # Visit Google first to establish history
+            # Visit Google first
             await page.goto("https://www.google.com", wait_until="domcontentloaded")
             await asyncio.sleep(5)
             
             print(f"🛰️ Navigating to target site...")
-            # Use 'domcontentloaded' to avoid getting hung up on external trackers
             await page.goto(url, wait_until="domcontentloaded", timeout=180000)
             
-            # Increased wait for the firewall check to process
-            print(f"⏳ Waiting 50 seconds for firewall clearance...")
-            await asyncio.sleep(50) 
+            # Wait for firewall clearance
+            print(f"⏳ Waiting 55 seconds for firewall clearance...")
+            await asyncio.sleep(55) 
 
             # Filename generation
             pkt_now = datetime.utcnow() + timedelta(hours=5)
