@@ -1,6 +1,7 @@
 import asyncio
 from playwright.async_api import async_playwright
-from playwright_stealth import stealth
+# MODIFIED IMPORT
+from playwright_stealth import stealth_async
 from datetime import datetime, timedelta
 import os
 import json
@@ -53,7 +54,7 @@ async def scrape_pmd_balochistan():
             "--disable-blink-features=AutomationControlled"
         ])
         
-        # Windows-based User Agent to look like a real person
+        # Windows-based User Agent
         user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         
         context = await browser.new_context(
@@ -67,31 +68,30 @@ async def scrape_pmd_balochistan():
         
         page = await context.new_page()
         
-        # FIXED: Correct stealth usage for Playwright Python
-        await stealth(page)
+        # FIXED: Correct stealth usage for Async Playwright
+        await stealth_async(page)
         
         url = "https://rmcbalochistan.pmd.gov.pk/www/dailyforecast.php"
         print(f"🔗 Attempting Stealth Connection to PMD Balochistan...")
         
         try:
-            # Step 1: Visit Google first to establish a "real" session history
+            # Visit Google first to establish history
             await page.goto("https://www.google.com", wait_until="domcontentloaded")
-            await asyncio.sleep(3)
+            await asyncio.sleep(5)
             
-            # Step 2: Navigate to the target URL
             print(f"🛰️ Navigating to target site...")
+            # Use 'domcontentloaded' to avoid getting hung up on external trackers
             await page.goto(url, wait_until="domcontentloaded", timeout=180000)
             
-            # Step 3: Wait for the security/firewall check to finish
-            print(f"⏳ Waiting 45 seconds for firewall clearance...")
-            await asyncio.sleep(45) 
+            # Increased wait for the firewall check to process
+            print(f"⏳ Waiting 50 seconds for firewall clearance...")
+            await asyncio.sleep(50) 
 
-            # PST Timestamp for filename
+            # Filename generation
             pkt_now = datetime.utcnow() + timedelta(hours=5)
             pdf_name = f"balochistan_forecast_{pkt_now.strftime('%Y-%m-%d_%H-%M')}_PKT.pdf"
             
             print(f"📄 Capturing PDF...")
-            # We use full_page=True in case the table is long
             await page.pdf(path=pdf_name, format="A4", print_background=True)
             
             if os.path.exists(pdf_name):
