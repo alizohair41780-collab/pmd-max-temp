@@ -2,13 +2,20 @@ name: Balochistan Forecast Scraper
 
 on:
   repository_dispatch:
-    # This allows you to trigger ONLY this script from Cron-job.org
+    # Triggered by Cron-job.org with {"event_type": "trigger_balochistan"}
     types: [trigger_balochistan]
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   scrape:
-    runs-on: ubuntu-latest
+    # Using macOS instead of Ubuntu to try and bypass IP blocking
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -21,7 +28,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install playwright google-api-python-client google-auth
+          # Added playwright-stealth to help bypass the security wall
+          pip install playwright google-api-python-client google-auth playwright-stealth
           python -m playwright install chromium --with-deps
 
       - name: Run Scraper
@@ -35,9 +43,16 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Pull latest to avoid merge conflicts
           git pull origin main --rebase
-          git add *.pdf
+          
+          # Add the new PDF
+          git add *.pdf || echo "No PDF found to add"
+          
           if [[ -n "$(git status --short)" ]]; then
-            git commit -m "Auto-update: Balochistan Forecast"
+            git commit -m "Auto-update: Balochistan Forecast PDF generated"
             git push origin main
+          else
+            echo "No changes detected."
           fi
